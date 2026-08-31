@@ -251,14 +251,17 @@
   const SUPABASE_URL = "https://hjcheyewsrnnlyatidvt.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_iQzzt9-ekUisgQaEltnoFQ_VARuLsf4";
 
+  // Para agregar un módulo nuevo en el futuro: solo se agrega un objeto
+  // aquí (nombre, desc, archivo) y se crea el archivo .html correspondiente
+  // dentro de la carpeta logistica/ — no hace falta tocar nada más.
   const MODULOS = [
-    { nombre: "Inventario",     desc: "Catálogo de productos" },
-    { nombre: "Almacenamiento", desc: "Bodegas y ubicaciones" },
-    { nombre: "Compras",        desc: "Órdenes de compra" },
-    { nombre: "Ingresos",       desc: "Recepción de mercadería" },
-    { nombre: "Despachos",      desc: "Salida de mercadería" },
-    { nombre: "Kardex",         desc: "Historial de movimientos" },
-    { nombre: "Guías internas", desc: "Documentos de traslado" }
+    { nombre: "Inventario",     desc: "Catálogo de productos",         archivo: "logistica/inventario.html" },
+    { nombre: "Almacenamiento", desc: "Bodegas y ubicaciones",          archivo: "logistica/almacenamiento.html" },
+    { nombre: "Compras",        desc: "Órdenes de compra",              archivo: "logistica/compras.html" },
+    { nombre: "Ingresos",       desc: "Recepción de mercadería",        archivo: "logistica/ingresos.html" },
+    { nombre: "Despachos",      desc: "Salida de mercadería",           archivo: "logistica/despachos.html" },
+    { nombre: "Kardex",         desc: "Historial de movimientos",       archivo: "logistica/kardex.html" },
+    { nombre: "Guías internas", desc: "Documentos de traslado",         archivo: "logistica/guias.html" }
   ];
 
   function initDashboard(){
@@ -299,15 +302,14 @@
       document.getElementById('empresa-nombre').textContent = activa.empresas.nombre;
       document.getElementById('empresa-rol').textContent = activa.rol;
 
-      // Render módulos (por ahora apuntan a un placeholder común;
-      // cada uno se reemplaza por su propia página cuando se construya)
+      // Render módulos: cada tarjeta enlaza a su archivo dentro de logistica/
       const grid = document.getElementById('modules-grid');
       grid.innerHTML = MODULOS.map((m, i) => `
-        <div class="module-card" onclick="alert('Módulo ${m.nombre}: en construcción')">
+        <a class="module-card" href="${m.archivo}">
           <div class="num">${String(i + 1).padStart(2, '0')}</div>
           <div class="name">${m.nombre}</div>
           <div class="desc">${m.desc}</div>
-        </div>
+        </a>
       `).join('');
 
       // Stock bajo: productos donde el stock actual < stock_minimo
