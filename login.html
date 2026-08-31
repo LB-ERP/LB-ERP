@@ -290,7 +290,7 @@
       <h1>Iniciar sesión</h1>
       <p class="sub">Ingresa con tu usuario y contraseña.</p>
 
-      <form id="login-form" autocomplete="on">
+      <form id="login-form" autocomplete="on" method="post" action="#">
         <div class="field">
           <label for="email">Usuario</label>
           <input type="email" id="email" name="email" placeholder="nombre@empresa.cl" required autocomplete="username">
@@ -318,8 +318,6 @@
   const SUPABASE_URL = "https://hjcheyewsrnnlyatidvt.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_iQzzt9-ekUisgQaEltnoFQ_VARuLsf4";
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
   const form = document.getElementById('login-form');
   const btn = document.getElementById('submit-btn');
   const msg = document.getElementById('msg');
@@ -329,36 +327,57 @@
     msg.className = 'msg ' + type;
   }
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    msg.className = 'msg';
-    btn.disabled = true;
-    btn.textContent = 'Verificando...';
-
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      btn.disabled = false;
-      btn.textContent = 'Ingresar';
-      showMsg('Usuario o contraseña incorrectos.', 'error');
+  // IMPORTANTE: si el navegador llega a enviar el formulario como un GET
+  // normal (verás email y password en la URL), significa que este script
+  // no llegó a ejecutarse a tiempo — normalmente por un bloqueador de
+  // anuncios/extensión de privacidad bloqueando la librería de Supabase.
+  // Este guard evita que eso pase en silencio y avisa con un mensaje claro.
+  function initLogin(){
+    if (typeof window.supabase === 'undefined') {
+      btn.disabled = true;
+      showMsg('No se pudo cargar la conexión con la base de datos. Desactiva el bloqueador de anuncios/extensión de privacidad para este sitio y vuelve a cargar la página.', 'error');
       return;
     }
 
-    // Login correcto. Aquí, en el siguiente paso, se debe:
-    // 1. Consultar la tabla usuarios_empresas para obtener la(s) empresa(s)
-    //    y el rol del usuario (data.user.id).
-    // 2. Guardar empresa_id activo (ej. en sessionStorage) para que las
-    //    consultas posteriores filtren por esa empresa (RLS lo refuerza
-    //    en el backend, esto es solo para la UI).
-    // 3. Redirigir al panel principal del ERP.
-    btn.textContent = 'Ingresando...';
-    showMsg('Acceso correcto. Redirigiendo...', 'info');
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // window.location.href = "dashboard.html";
-  });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'msg';
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = 'Ingresar';
+        showMsg('Usuario o contraseña incorrectos.', 'error');
+        return;
+      }
+
+      // Login correcto. Aquí, en el siguiente paso, se debe:
+      // 1. Consultar la tabla usuarios_empresas para obtener la(s) empresa(s)
+      //    y el rol del usuario (data.user.id).
+      // 2. Guardar empresa_id activo (ej. en sessionStorage) para que las
+      //    consultas posteriores filtren por esa empresa (RLS lo refuerza
+      //    en el backend, esto es solo para la UI).
+      // 3. Redirigir al panel principal del ERP.
+      btn.textContent = 'Ingresando...';
+      showMsg('Acceso correcto. Redirigiendo...', 'info');
+
+      // window.location.href = "dashboard.html";
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initLogin);
+  } else {
+    initLogin();
+  }
 </script>
 
 </body>
