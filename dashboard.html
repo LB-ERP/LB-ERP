@@ -312,26 +312,15 @@
         </a>
       `).join('');
 
-      // Stock bajo: productos donde el stock actual < stock_minimo
+      // Stock bajo: productos donde stock_actual < stock_minimo
       const { data: productos } = await supabaseClient
         .from('productos')
-        .select('id, sku, nombre, stock_minimo')
+        .select('id, sku, descripcion_1, stock_actual, stock_minimo')
         .eq('empresa_id', empresaActivaId)
         .eq('activo', true);
 
-      const { data: stocks } = await supabaseClient
-        .from('stock_actual')
-        .select('producto_id, stock')
-        .eq('empresa_id', empresaActivaId);
-
-      const stockPorProducto = {};
-      (stocks || []).forEach(s => { stockPorProducto[s.producto_id] = s.stock; });
-
       const stockBajoList = document.getElementById('stock-bajo-list');
-      const conStockBajo = (productos || []).filter(p => {
-        const actual = stockPorProducto[p.id] || 0;
-        return actual < (p.stock_minimo || 0);
-      });
+      const conStockBajo = (productos || []).filter(p => (p.stock_actual || 0) < (p.stock_minimo || 0));
 
       if (conStockBajo.length === 0) {
         stockBajoList.innerHTML = '<div class="stat-empty">No hay productos con stock bajo el mínimo.</div>';
@@ -339,10 +328,10 @@
         stockBajoList.innerHTML = conStockBajo.slice(0, 6).map(p => `
           <div class="stock-row">
             <div>
-              <div>${p.nombre}</div>
+              <div>${p.descripcion_1 || p.sku}</div>
               <div class="sku">${p.sku}</div>
             </div>
-            <div class="stock-badge">${stockPorProducto[p.id] || 0} / mín. ${p.stock_minimo}</div>
+            <div class="stock-badge">${p.stock_actual || 0} / mín. ${p.stock_minimo}</div>
           </div>
         `).join('');
       }
