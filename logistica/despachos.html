@@ -263,7 +263,7 @@
 
     const { data: despachos } = await supabaseClient
       .from('despachos')
-      .select('id, fecha, referencia, destinatario, bodegas ( nombre ), despachos_items ( cantidad )')
+      .select('id, fecha, referencia, destinatario, bodegas ( nombre ), despachos_items ( cantidad, productos ( sku, descripcion_1 ) )')
       .eq('empresa_id', empresaActivaId)
       .order('fecha', { ascending: false })
       .limit(50);
@@ -276,13 +276,17 @@
     tbody.innerHTML = despachos.map(d => {
       const items = d.despachos_items || [];
       const totalUnidades = items.reduce((sum, it) => sum + (it.cantidad || 0), 0);
+      const nombresProductos = items.map(it => {
+        const nombre = it.productos ? (it.productos.descripcion_1 || it.productos.sku) : '—';
+        return `${nombre} (${it.cantidad})`;
+      }).join('<br>');
       return `
         <tr>
           <td>${d.fecha}</td>
           <td>${d.referencia || '<span class="muted">—</span>'}</td>
           <td>${d.bodegas ? d.bodegas.nombre : '<span class="muted">—</span>'}</td>
           <td>${d.destinatario || '<span class="muted">—</span>'}</td>
-          <td>${items.length}</td>
+          <td>${nombresProductos}</td>
           <td>${totalUnidades}</td>
         </tr>
       `;

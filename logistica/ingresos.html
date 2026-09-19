@@ -256,7 +256,7 @@
 
     const { data: ingresos } = await supabaseClient
       .from('ingresos')
-      .select('id, fecha, numero_ingreso, bodegas ( nombre ), ingresos_items ( cantidad, costo_unitario )')
+      .select('id, fecha, numero_ingreso, bodegas ( nombre ), ingresos_items ( cantidad, costo_unitario, productos ( sku, descripcion_1 ) )')
       .eq('empresa_id', empresaActivaId)
       .order('fecha', { ascending: false })
       .limit(50);
@@ -270,12 +270,16 @@
       const items = i.ingresos_items || [];
       const totalUnidades = items.reduce((sum, it) => sum + (it.cantidad || 0), 0);
       const costoTotal = items.reduce((sum, it) => sum + (it.cantidad || 0) * (it.costo_unitario || 0), 0);
+      const nombresProductos = items.map(it => {
+        const nombre = it.productos ? (it.productos.descripcion_1 || it.productos.sku) : '—';
+        return `${nombre} (${it.cantidad})`;
+      }).join('<br>');
       return `
         <tr>
           <td>${i.fecha}</td>
           <td>${i.numero_ingreso || '<span class="muted">—</span>'}</td>
           <td>${i.bodegas ? i.bodegas.nombre : '<span class="muted">—</span>'}</td>
-          <td>${items.length}</td>
+          <td>${nombresProductos}</td>
           <td>${totalUnidades}</td>
           <td>$${costoTotal.toLocaleString('es-CL')}</td>
         </tr>
