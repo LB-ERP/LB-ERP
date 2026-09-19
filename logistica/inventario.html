@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg-deep:#10151c; --bg-panel:#171d26; --bg-card:#1b222c;
@@ -30,7 +31,7 @@
   }
   .back-link:hover{ border-color:var(--accent); }
 
-  main{ max-width:1100px; margin:0 auto; padding:32px; }
+  main{ max-width:1400px; margin:0 auto; padding:32px; }
 
   .toolbar{
     display:flex; justify-content:space-between; align-items:center; gap:16px;
@@ -39,11 +40,11 @@
   .toolbar h1{ font-family:'Oswald', sans-serif; font-size:22px; margin:0; font-weight:600; }
   .toolbar-right{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 
-  input[type="text"], input[type="number"]{
+  input[type="text"], input[type="number"], select{
     background:#12171f; border:1px solid var(--line); border-radius:3px;
     padding:10px 12px; font-size:14px; color:var(--text-primary); font-family:'Work Sans', sans-serif;
   }
-  input:focus{ outline:none; border-color:var(--accent); }
+  input:focus, select:focus{ outline:none; border-color:var(--accent); }
 
   .btn{
     padding:10px 16px; border-radius:3px; font-size:14px; font-weight:600;
@@ -55,15 +56,17 @@
   .btn-ghost:hover{ border-color:var(--accent); }
   .btn-sm{ padding:6px 10px; font-size:12.5px; }
 
-  table{ width:100%; border-collapse:collapse; background:var(--bg-card); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:4px; background:var(--bg-card); }
+  table{ width:100%; border-collapse:collapse; min-width:1180px; }
   thead th{
-    text-align:left; font-family:'Oswald', sans-serif; font-weight:500; font-size:12.5px;
-    letter-spacing:0.5px; color:var(--text-muted); padding:12px 16px; border-bottom:1px solid var(--line);
+    text-align:left; font-family:'Oswald', sans-serif; font-weight:500; font-size:11.5px;
+    letter-spacing:0.5px; color:var(--text-muted); padding:12px 14px; border-bottom:1px solid var(--line);
+    white-space:nowrap;
   }
-  tbody td{ padding:13px 16px; border-bottom:1px solid var(--line); font-size:13.5px; }
+  tbody td{ padding:12px 14px; border-bottom:1px solid var(--line); font-size:13px; white-space:nowrap; }
   tbody tr:last-child td{ border-bottom:none; }
   tbody tr:hover{ background:rgba(255,255,255,0.02); }
-  .sku{ color:var(--text-muted); font-size:11.5px; }
+  .muted{ color:var(--text-muted); }
   .stock-ok{ color:var(--ok); }
   .stock-bajo{ color:var(--error); font-weight:600; }
   .badge-inactivo{
@@ -71,22 +74,24 @@
     background:rgba(139,147,161,0.15); color:var(--text-muted);
   }
   .actions-cell{ display:flex; gap:8px; }
-  .empty-state{ padding:50px; text-align:center; color:var(--text-muted); font-size:14px; }
+  .empty-state{ padding:50px; text-align:center; color:var(--text-muted); font-size:14px; white-space:normal; }
 
   /* modal */
   .modal-overlay{
     position:fixed; inset:0; background:rgba(0,0,0,0.6);
-    display:none; align-items:center; justify-content:center; padding:20px; z-index:10;
+    display:none; align-items:center; justify-content:center; padding:20px; z-index:10; overflow-y:auto;
   }
   .modal-overlay.open{ display:flex; }
   .modal{
     background:var(--bg-card); border:1px solid var(--line); border-radius:4px;
-    padding:30px; width:100%; max-width:420px;
+    padding:30px; width:100%; max-width:520px; margin:auto;
   }
-  .modal h2{ font-family:'Oswald', sans-serif; font-size:19px; margin:0 0 22px; font-weight:600; }
+  .modal h2{ font-family:'Oswald', sans-serif; font-size:19px; margin:0 0 4px; font-weight:600; }
+  .modal .modal-sub{ font-size:12.5px; color:var(--text-muted); margin:0 0 22px; }
   .field{ margin-bottom:16px; }
   .field label{ display:block; font-size:12.5px; color:var(--text-muted); margin-bottom:6px; }
-  .field input{ width:100%; }
+  .field label .req{ color:var(--accent); }
+  .field input, .field select{ width:100%; }
   .field-row{ display:flex; gap:12px; }
   .field-row .field{ flex:1; }
   .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; }
@@ -110,26 +115,41 @@
     <div class="toolbar">
       <h1>Inventario</h1>
       <div class="toolbar-right">
-        <input type="text" id="buscador" placeholder="Buscar por SKU o nombre...">
+        <input type="text" id="buscador" placeholder="Buscar por SKU, área o descripción...">
+        <button class="btn btn-ghost" id="btn-plantilla" title="Descarga un Excel de ejemplo con las columnas correctas">Plantilla</button>
+        <input type="file" id="input-excel" accept=".xlsx,.xls,.csv" style="display:none;">
+        <button class="btn btn-ghost" id="btn-cargar-excel">📥 Cargar Excel</button>
+        <button class="btn btn-ghost" id="btn-descargar-excel">📤 Descargar Excel</button>
         <button class="btn btn-primary" id="btn-nuevo">+ Nuevo producto</button>
       </div>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Unidad</th>
-          <th>Stock actual</th>
-          <th>Stock mínimo</th>
-          <th>Estado</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="tabla-body">
-        <tr><td colspan="6"><div class="empty-state">Cargando productos...</div></td></tr>
-      </tbody>
-    </table>
+    <div id="import-status" style="display:none; margin-bottom:16px; padding:12px 16px; border-radius:3px; font-size:13px; border:1px solid var(--line); background:var(--bg-card);"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Área</th>
+            <th>Descripción 1</th>
+            <th>Descripción 2</th>
+            <th>UN. medida</th>
+            <th>Stock actual</th>
+            <th>Stock mínimo</th>
+            <th>Costo unit.</th>
+            <th>Costo total</th>
+            <th>Bodega</th>
+            <th>Ubicación</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tabla-body">
+          <tr><td colspan="13"><div class="empty-state">Cargando productos...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 </div>
 
@@ -137,26 +157,65 @@
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <h2 id="modal-title">Nuevo producto</h2>
+    <p class="modal-sub">Campos con <span class="req">*</span> son obligatorios.</p>
     <form id="form-producto">
       <input type="hidden" id="producto-id">
+
+      <div class="field-row">
+        <div class="field">
+          <label for="sku">SKU <span class="req">*</span></label>
+          <input type="text" id="sku" required placeholder="ej. TUB-001">
+        </div>
+        <div class="field">
+          <label for="area">Área <span class="req">*</span></label>
+          <input type="text" id="area" required placeholder="ej. Producción">
+        </div>
+      </div>
+
       <div class="field">
-        <label for="sku">SKU</label>
-        <input type="text" id="sku" required placeholder="ej. TUB-001">
+        <label for="descripcion1">Descripción 1</label>
+        <input type="text" id="descripcion1" placeholder="ej. Tubo galvanizado 2 pulgadas">
       </div>
       <div class="field">
-        <label for="nombre">Nombre</label>
-        <input type="text" id="nombre" required placeholder="ej. Tubo galvanizado 2\"">
+        <label for="descripcion2">Descripción 2</label>
+        <input type="text" id="descripcion2" placeholder="detalle adicional (opcional)">
       </div>
+
       <div class="field-row">
         <div class="field">
           <label for="unidad">Unidad de medida</label>
           <input type="text" id="unidad" placeholder="UN, KG, MT..." value="UN">
         </div>
         <div class="field">
+          <label for="stock-actual">Stock actual <span class="req">*</span></label>
+          <input type="number" id="stock-actual" required value="0" min="0" step="any">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
           <label for="stock-minimo">Stock mínimo</label>
           <input type="number" id="stock-minimo" value="0" min="0" step="any">
         </div>
+        <div class="field">
+          <label for="costo-unitario">Costo unitario <span class="req">*</span></label>
+          <input type="number" id="costo-unitario" required value="0" min="0" step="any">
+        </div>
       </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="bodega">Bodega</label>
+          <select id="bodega">
+            <option value="">— Sin asignar —</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ubicacion">Ubicación</label>
+          <input type="text" id="ubicacion" placeholder="ej. Pasillo 3, Rack B">
+        </div>
+      </div>
+
       <div class="modal-msg" id="modal-msg"></div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="btn-cancelar">Cancelar</button>
@@ -173,7 +232,11 @@
   let supabaseClient;
   let empresaActivaId = null;
   let productosCache = [];
-  let stockCache = {};
+  let bodegasCache = [];
+
+  function fmtMoneda(n){
+    return (n || 0).toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
 
   function init(){
     if (typeof window.supabase === 'undefined') {
@@ -203,26 +266,37 @@
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
 
+    await cargarBodegas();
     await cargarProductos();
+  }
+
+  async function cargarBodegas(){
+    const { data } = await supabaseClient
+      .from('bodegas')
+      .select('id, nombre')
+      .eq('empresa_id', empresaActivaId)
+      .eq('activo', true)
+      .order('nombre');
+
+    bodegasCache = data || [];
+    const select = document.getElementById('bodega');
+    select.innerHTML = '<option value="">— Sin asignar —</option>' +
+      bodegasCache.map(b => `<option value="${b.id}">${b.nombre}</option>`).join('');
+
+    if (bodegasCache.length === 0) {
+      select.innerHTML += '<option value="" disabled>(no hay bodegas creadas aún — módulo Almacenamiento)</option>';
+    }
   }
 
   async function cargarProductos(){
     const tbody = document.getElementById('tabla-body');
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">Cargando productos...</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13"><div class="empty-state">Cargando productos...</div></td></tr>';
 
     const { data: productos } = await supabaseClient
       .from('productos')
-      .select('*')
+      .select('*, bodegas ( nombre )')
       .eq('empresa_id', empresaActivaId)
-      .order('nombre');
-
-    const { data: stocks } = await supabaseClient
-      .from('stock_actual')
-      .select('producto_id, stock')
-      .eq('empresa_id', empresaActivaId);
-
-    stockCache = {};
-    (stocks || []).forEach(s => { stockCache[s.producto_id] = s.stock; });
+      .order('sku');
 
     productosCache = productos || [];
     renderTabla(productosCache);
@@ -232,22 +306,27 @@
     const tbody = document.getElementById('tabla-body');
 
     if (productos.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">No hay productos todavía. Crea el primero con "+ Nuevo producto".</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="13"><div class="empty-state">No hay productos todavía. Crea el primero con "+ Nuevo producto".</div></td></tr>';
       return;
     }
 
     tbody.innerHTML = productos.map(p => {
-      const stock = stockCache[p.id] || 0;
+      const stock = p.stock_actual || 0;
       const bajo = stock < (p.stock_minimo || 0);
+      const costoTotal = stock * (p.costo_unitario || 0);
       return `
         <tr>
-          <td>
-            <div>${p.nombre}</div>
-            <div class="sku">${p.sku}</div>
-          </td>
+          <td>${p.sku}</td>
+          <td>${p.area || '<span class="muted">—</span>'}</td>
+          <td>${p.descripcion_1 || '<span class="muted">—</span>'}</td>
+          <td>${p.descripcion_2 || '<span class="muted">—</span>'}</td>
           <td>${p.unidad_medida || 'UN'}</td>
           <td class="${bajo ? 'stock-bajo' : 'stock-ok'}">${stock}</td>
           <td>${p.stock_minimo || 0}</td>
+          <td>$${fmtMoneda(p.costo_unitario)}</td>
+          <td>$${fmtMoneda(costoTotal)}</td>
+          <td>${p.bodegas ? p.bodegas.nombre : '<span class="muted">—</span>'}</td>
+          <td>${p.ubicacion || '<span class="muted">—</span>'}</td>
           <td>${p.activo ? '' : '<span class="badge-inactivo">Inactivo</span>'}</td>
           <td>
             <div class="actions-cell">
@@ -260,11 +339,13 @@
     }).join('');
   }
 
-  // Buscador (filtra en el cliente sobre lo ya cargado)
   document.getElementById('buscador').addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
     const filtrados = productosCache.filter(p =>
-      p.nombre.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+      (p.sku || '').toLowerCase().includes(q) ||
+      (p.area || '').toLowerCase().includes(q) ||
+      (p.descripcion_1 || '').toLowerCase().includes(q) ||
+      (p.descripcion_2 || '').toLowerCase().includes(q)
     );
     renderTabla(filtrados);
   });
@@ -280,15 +361,23 @@
       document.getElementById('modal-title').textContent = 'Editar producto';
       document.getElementById('producto-id').value = producto.id;
       document.getElementById('sku').value = producto.sku;
-      document.getElementById('nombre').value = producto.nombre;
+      document.getElementById('area').value = producto.area || '';
+      document.getElementById('descripcion1').value = producto.descripcion_1 || '';
+      document.getElementById('descripcion2').value = producto.descripcion_2 || '';
       document.getElementById('unidad').value = producto.unidad_medida || 'UN';
+      document.getElementById('stock-actual').value = producto.stock_actual || 0;
       document.getElementById('stock-minimo').value = producto.stock_minimo || 0;
+      document.getElementById('costo-unitario').value = producto.costo_unitario || 0;
+      document.getElementById('bodega').value = producto.bodega_id || '';
+      document.getElementById('ubicacion').value = producto.ubicacion || '';
     } else {
       document.getElementById('modal-title').textContent = 'Nuevo producto';
       form.reset();
       document.getElementById('producto-id').value = '';
       document.getElementById('unidad').value = 'UN';
+      document.getElementById('stock-actual').value = 0;
       document.getElementById('stock-minimo').value = 0;
+      document.getElementById('costo-unitario').value = 0;
     }
     overlay.classList.add('open');
   }
@@ -326,14 +415,19 @@
     const payload = {
       empresa_id: empresaActivaId,
       sku: document.getElementById('sku').value.trim(),
-      nombre: document.getElementById('nombre').value.trim(),
+      area: document.getElementById('area').value.trim(),
+      descripcion_1: document.getElementById('descripcion1').value.trim() || null,
+      descripcion_2: document.getElementById('descripcion2').value.trim() || null,
       unidad_medida: document.getElementById('unidad').value.trim() || 'UN',
-      stock_minimo: parseFloat(document.getElementById('stock-minimo').value) || 0
+      stock_actual: parseFloat(document.getElementById('stock-actual').value) || 0,
+      stock_minimo: parseFloat(document.getElementById('stock-minimo').value) || 0,
+      costo_unitario: parseFloat(document.getElementById('costo-unitario').value) || 0,
+      bodega_id: document.getElementById('bodega').value || null,
+      ubicacion: document.getElementById('ubicacion').value.trim() || null
     };
 
     let error;
     if (id) {
-      // Al editar no se reescribe empresa_id
       delete payload.empresa_id;
       ({ error } = await supabaseClient.from('productos').update(payload).eq('id', id));
     } else {
@@ -353,6 +447,189 @@
 
     cerrarModal();
     await cargarProductos();
+  });
+
+  // ================== EXCEL: plantilla / carga / descarga ==================
+
+  const COLUMNAS_EXCEL = [
+    { header: 'SKU',              key: 'sku' },
+    { header: 'Area',             key: 'area' },
+    { header: 'Descripcion 1',    key: 'descripcion_1' },
+    { header: 'Descripcion 2',    key: 'descripcion_2' },
+    { header: 'Unidad de Medida', key: 'unidad_medida' },
+    { header: 'Stock Actual',     key: 'stock_actual' },
+    { header: 'Stock Minimo',     key: 'stock_minimo' },
+    { header: 'Costo Unitario',   key: 'costo_unitario' },
+    { header: 'Costo Total',      key: 'costo_total' },
+    { header: 'Bodega',           key: 'bodega_nombre' },
+    { header: 'Ubicacion',        key: 'ubicacion' },
+    { header: 'Estado',           key: 'estado' }
+  ];
+
+  function normalizarTexto(t){
+    return (t || '').toString().trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  // Encabezados aceptados al importar (varias formas de escribir lo mismo)
+  const MAPA_ENCABEZADOS = {
+    'sku': 'sku',
+    'area': 'area',
+    'descripcion 1': 'descripcion_1', 'descripcion1': 'descripcion_1', 'descripcion': 'descripcion_1',
+    'descripcion 2': 'descripcion_2', 'descripcion2': 'descripcion_2',
+    'unidad de medida': 'unidad_medida', 'unidad': 'unidad_medida', 'un de medida': 'unidad_medida', 'un. medida': 'unidad_medida', 'um': 'unidad_medida',
+    'stock actual': 'stock_actual',
+    'stock minimo': 'stock_minimo', 'stock mínimo': 'stock_minimo',
+    'costo unitario': 'costo_unitario', 'costo unit.': 'costo_unitario', 'costo unit': 'costo_unitario',
+    'bodega': 'bodega_nombre',
+    'ubicacion': 'ubicacion', 'ubicación': 'ubicacion'
+  };
+
+  function mostrarEstadoImportacion(html, tipo){
+    const el = document.getElementById('import-status');
+    el.style.display = 'block';
+    el.style.borderColor = tipo === 'error' ? 'var(--error)' : (tipo === 'ok' ? 'var(--ok)' : 'var(--line)');
+    el.innerHTML = html;
+  }
+
+  // ---- Plantilla ----
+  document.getElementById('btn-plantilla').addEventListener('click', () => {
+    const ejemplo = [{
+      'SKU': 'TUB-001',
+      'Area': 'Producción',
+      'Descripcion 1': 'Tubo galvanizado 2 pulgadas',
+      'Descripcion 2': '',
+      'Unidad de Medida': 'UN',
+      'Stock Actual': 100,
+      'Stock Minimo': 10,
+      'Costo Unitario': 2500,
+      'Bodega': '',
+      'Ubicacion': ''
+    }];
+    const ws = XLSX.utils.json_to_sheet(ejemplo);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla');
+    XLSX.writeFile(wb, 'plantilla_inventario.xlsx');
+  });
+
+  // ---- Descargar Excel (cada campo en su propia columna) ----
+  document.getElementById('btn-descargar-excel').addEventListener('click', () => {
+    if (productosCache.length === 0) {
+      alert('No hay productos para exportar.');
+      return;
+    }
+
+    const filas = productosCache.map(p => {
+      const stock = p.stock_actual || 0;
+      const costoUnit = p.costo_unitario || 0;
+      const fila = {};
+      COLUMNAS_EXCEL.forEach(col => {
+        let valor;
+        switch (col.key) {
+          case 'costo_total': valor = stock * costoUnit; break;
+          case 'bodega_nombre': valor = p.bodegas ? p.bodegas.nombre : ''; break;
+          case 'estado': valor = p.activo ? 'Activo' : 'Inactivo'; break;
+          default: valor = p[col.key];
+        }
+        fila[col.header] = (valor === null || valor === undefined) ? '' : valor;
+      });
+      return fila;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(filas, { header: COLUMNAS_EXCEL.map(c => c.header) });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `inventario_${fecha}.xlsx`);
+  });
+
+  // ---- Cargar Excel (importación masiva) ----
+  document.getElementById('btn-cargar-excel').addEventListener('click', () => {
+    document.getElementById('input-excel').click();
+  });
+
+  document.getElementById('input-excel').addEventListener('change', async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+
+    mostrarEstadoImportacion('Leyendo archivo...', 'info');
+
+    const datos = await archivo.arrayBuffer();
+    const wb = XLSX.read(datos, { type: 'array' });
+    const primeraHoja = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(primeraHoja, { defval: '' });
+
+    if (filas.length === 0) {
+      mostrarEstadoImportacion('El archivo no tiene filas con datos.', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const validos = [];
+    const errores = [];
+
+    filas.forEach((filaOriginal, i) => {
+      const fila = {};
+      Object.keys(filaOriginal).forEach(k => {
+        const campo = MAPA_ENCABEZADOS[normalizarTexto(k)];
+        if (campo) fila[campo] = filaOriginal[k];
+      });
+
+      const sku = (fila.sku || '').toString().trim();
+      const area = (fila.area || '').toString().trim();
+      const stockActual = fila.stock_actual;
+      const costoUnitario = fila.costo_unitario;
+
+      if (!sku || !area || stockActual === '' || stockActual === undefined || costoUnitario === '' || costoUnitario === undefined) {
+        errores.push(`Fila ${i + 2}: faltan campos obligatorios (SKU, Área, Stock Actual o Costo Unitario).`);
+        return;
+      }
+
+      const bodegaNombre = normalizarTexto(fila.bodega_nombre);
+      const bodegaMatch = bodegaNombre ? bodegasCache.find(b => normalizarTexto(b.nombre) === bodegaNombre) : null;
+
+      validos.push({
+        empresa_id: empresaActivaId,
+        sku: sku,
+        area: area,
+        descripcion_1: (fila.descripcion_1 || '').toString().trim() || null,
+        descripcion_2: (fila.descripcion_2 || '').toString().trim() || null,
+        unidad_medida: (fila.unidad_medida || 'UN').toString().trim() || 'UN',
+        stock_actual: parseFloat(stockActual) || 0,
+        stock_minimo: parseFloat(fila.stock_minimo) || 0,
+        costo_unitario: parseFloat(costoUnitario) || 0,
+        bodega_id: bodegaMatch ? bodegaMatch.id : null,
+        ubicacion: (fila.ubicacion || '').toString().trim() || null
+      });
+    });
+
+    let insertados = 0;
+    let errorInsercion = null;
+
+    if (validos.length > 0) {
+      const { error, data } = await supabaseClient.from('productos').insert(validos).select();
+      if (error) {
+        errorInsercion = error.message.includes('duplicate')
+          ? 'Algunos SKU ya existen — no se importó ningún producto de este archivo. Revisa los SKU duplicados y vuelve a intentar.'
+          : 'Ocurrió un error al guardar en la base de datos: ' + error.message;
+      } else {
+        insertados = (data || []).length;
+      }
+    }
+
+    let resumen = `<strong>${insertados}</strong> producto(s) importado(s) correctamente.`;
+    if (errores.length > 0) {
+      resumen += `<br><strong>${errores.length}</strong> fila(s) con errores:<br>` + errores.slice(0, 8).join('<br>');
+      if (errores.length > 8) resumen += `<br>...y ${errores.length - 8} más.`;
+    }
+    if (errorInsercion) {
+      resumen += `<br><span style="color:var(--error)">${errorInsercion}</span>`;
+    }
+
+    mostrarEstadoImportacion(resumen, errorInsercion || errores.length > 0 ? 'error' : 'ok');
+    e.target.value = '';
+
+    if (insertados > 0) await cargarProductos();
   });
 
   if (document.readyState === 'loading') {
