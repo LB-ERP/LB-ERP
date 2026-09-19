@@ -10,11 +10,13 @@
 <style>
   :root{
     --bg-deep:#10151c; --bg-panel:#171d26; --bg-card:#1b222c;
-    --line:#2b3542; --accent:#c98a3e; --text-primary:#edeae3; --text-muted:#8b93a1;
+    --line:#2b3542; --accent:#c98a3e; --accent-hover:#dea057;
+    --text-primary:#edeae3; --text-muted:#8b93a1; --error:#d97757; --ok:#7fae86;
   }
   *{box-sizing:border-box;}
   html,body{ margin:0; min-height:100%; font-family:'Work Sans', sans-serif; color:var(--text-primary); background:var(--bg-deep); }
-  a{ color:inherit; }
+  a{ color:inherit; text-decoration:none; }
+
   header{
     display:flex; align-items:center; justify-content:space-between;
     padding:18px 32px; border-bottom:1px solid var(--line); background:var(--bg-panel); flex-wrap:wrap; gap:12px;
@@ -24,12 +26,55 @@
   .crumb{ font-size:13px; color:var(--text-muted); }
   .back-link{
     font-size:13px; color:var(--text-muted); border:1px solid var(--line);
-    padding:8px 14px; border-radius:3px; text-decoration:none; transition:border-color .15s ease;
+    padding:8px 14px; border-radius:3px; transition:border-color .15s ease;
   }
   .back-link:hover{ border-color:var(--accent); }
-  main{ max-width:900px; margin:0 auto; padding:60px 32px; text-align:center; }
-  main h1{ font-family:'Oswald', sans-serif; font-size:26px; margin-bottom:10px; }
-  main p{ color:var(--text-muted); font-size:14.5px; }
+
+  main{ max-width:1200px; margin:0 auto; padding:32px; }
+
+  h1{ font-family:'Oswald', sans-serif; font-size:22px; margin:0 0 20px; font-weight:600; }
+
+  .filtros{
+    display:flex; gap:10px; flex-wrap:wrap; align-items:end;
+    background:var(--bg-card); border:1px solid var(--line); border-radius:4px; padding:16px; margin-bottom:20px;
+  }
+  .filtro-campo{ display:flex; flex-direction:column; gap:5px; }
+  .filtro-campo label{ font-size:11.5px; color:var(--text-muted); }
+  input[type="text"], input[type="date"], select{
+    background:#12171f; border:1px solid var(--line); border-radius:3px;
+    padding:9px 11px; font-size:13.5px; color:var(--text-primary); font-family:'Work Sans', sans-serif;
+  }
+  input:focus, select:focus{ outline:none; border-color:var(--accent); }
+
+  .btn{
+    padding:9px 14px; border-radius:3px; font-size:13.5px; font-weight:600;
+    font-family:'Work Sans', sans-serif; cursor:pointer; border:none;
+  }
+  .btn-ghost{ background:none; border:1px solid var(--line); color:var(--text-primary); }
+  .btn-ghost:hover{ border-color:var(--accent); }
+
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:4px; background:var(--bg-card); }
+  table{ width:100%; border-collapse:collapse; min-width:900px; }
+  thead th{
+    text-align:left; font-family:'Oswald', sans-serif; font-weight:500; font-size:11.5px;
+    letter-spacing:0.5px; color:var(--text-muted); padding:12px 14px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  tbody td{ padding:11px 14px; border-bottom:1px solid var(--line); font-size:13px; white-space:nowrap; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:rgba(255,255,255,0.02); }
+  .muted{ color:var(--text-muted); }
+  .cantidad-mas{ color:var(--ok); font-weight:600; }
+  .cantidad-menos{ color:var(--error); font-weight:600; }
+  .badge{
+    font-size:11px; padding:2px 9px; border-radius:20px; text-transform:capitalize; white-space:nowrap;
+  }
+  .badge.ingreso, .badge.ajuste_positivo{ background:rgba(127,174,134,0.15); color:var(--ok); }
+  .badge.despacho, .badge.ajuste_negativo{ background:rgba(217,119,87,0.15); color:var(--error); }
+  .empty-state{ padding:50px; text-align:center; color:var(--text-muted); font-size:14px; }
+
+  .resumen{ display:flex; gap:24px; margin-bottom:16px; font-size:13px; color:var(--text-muted); flex-wrap:wrap; }
+  .resumen strong{ color:var(--text-primary); }
+
   .loading{ padding:60px; text-align:center; color:var(--text-muted); font-size:14px; }
 </style>
 </head>
@@ -43,9 +88,60 @@
     <div class="crumb">Logística / Kardex</div>
     <a class="back-link" href="../dashboard.html">← Volver al panel</a>
   </header>
+
   <main>
     <h1>Kardex</h1>
-    <p>Este módulo está en construcción. Aquí va a vivir la funcionalidad de el historial de movimientos de stock.</p>
+
+    <div class="filtros">
+      <div class="filtro-campo">
+        <label for="f-producto">Producto</label>
+        <select id="f-producto"><option value="">Todos</option></select>
+      </div>
+      <div class="filtro-campo">
+        <label for="f-bodega">Bodega</label>
+        <select id="f-bodega"><option value="">Todas</option></select>
+      </div>
+      <div class="filtro-campo">
+        <label for="f-tipo">Tipo de movimiento</label>
+        <select id="f-tipo">
+          <option value="">Todos</option>
+          <option value="ingreso">Ingreso</option>
+          <option value="despacho">Despacho</option>
+          <option value="ajuste_positivo">Ajuste positivo</option>
+          <option value="ajuste_negativo">Ajuste negativo</option>
+        </select>
+      </div>
+      <div class="filtro-campo">
+        <label for="f-desde">Desde</label>
+        <input type="date" id="f-desde">
+      </div>
+      <div class="filtro-campo">
+        <label for="f-hasta">Hasta</label>
+        <input type="date" id="f-hasta">
+      </div>
+      <button class="btn btn-ghost" id="btn-limpiar">Limpiar filtros</button>
+    </div>
+
+    <div class="resumen" id="resumen"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Producto</th>
+            <th>Tipo</th>
+            <th>Cantidad</th>
+            <th>Costo unit.</th>
+            <th>Bodega</th>
+            <th>Origen</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-body">
+          <tr><td colspan="7"><div class="empty-state">Cargando movimientos...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 </div>
 
@@ -53,22 +149,140 @@
   const SUPABASE_URL = "https://hjcheyewsrnnlyatidvt.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_iQzzt9-ekUisgQaEltnoFQ_VARuLsf4";
 
+  let supabaseClient;
+  let empresaActivaId = null;
+
   function init(){
     if (typeof window.supabase === 'undefined') {
       document.getElementById('loading').textContent = 'No se pudo cargar la conexión. Desactiva bloqueadores de anuncios y recarga.';
       return;
     }
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        window.location.href = "../login.html";
-        return;
-      }
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-    });
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    arrancar();
   }
+
+  async function arrancar(){
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = "../login.html"; return; }
+
+    const { data: relaciones, error } = await supabaseClient
+      .from('usuarios_empresas')
+      .select('empresas ( id, nombre )')
+      .eq('user_id', session.user.id);
+
+    if (error || !relaciones || relaciones.length === 0) {
+      document.getElementById('loading').textContent = 'Tu usuario no está asociado a ninguna empresa.';
+      return;
+    }
+
+    empresaActivaId = relaciones[0].empresas.id;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    await cargarFiltros();
+    await cargarKardex();
+  }
+
+  async function cargarFiltros(){
+    const { data: productos } = await supabaseClient
+      .from('productos')
+      .select('id, sku, descripcion_1')
+      .eq('empresa_id', empresaActivaId)
+      .order('sku');
+
+    const selectProducto = document.getElementById('f-producto');
+    selectProducto.innerHTML = '<option value="">Todos</option>' +
+      (productos || []).map(p => `<option value="${p.id}">${p.sku} — ${p.descripcion_1 || ''}</option>`).join('');
+
+    const { data: bodegas } = await supabaseClient
+      .from('bodegas')
+      .select('id, nombre')
+      .eq('empresa_id', empresaActivaId)
+      .order('nombre');
+
+    const selectBodega = document.getElementById('f-bodega');
+    selectBodega.innerHTML = '<option value="">Todas</option>' +
+      (bodegas || []).map(b => `<option value="${b.id}">${b.nombre}</option>`).join('');
+  }
+
+  async function cargarKardex(){
+    const tbody = document.getElementById('tabla-body');
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Cargando movimientos...</div></td></tr>';
+
+    let query = supabaseClient
+      .from('kardex')
+      .select('id, fecha, tipo_movimiento, cantidad, costo_unitario, origen_tabla, productos ( sku, descripcion_1 ), bodegas ( nombre )')
+      .eq('empresa_id', empresaActivaId)
+      .order('fecha', { ascending: false })
+      .limit(300);
+
+    const producto = document.getElementById('f-producto').value;
+    const bodega = document.getElementById('f-bodega').value;
+    const tipo = document.getElementById('f-tipo').value;
+    const desde = document.getElementById('f-desde').value;
+    const hasta = document.getElementById('f-hasta').value;
+
+    if (producto) query = query.eq('producto_id', producto);
+    if (bodega) query = query.eq('bodega_id', bodega);
+    if (tipo) query = query.eq('tipo_movimiento', tipo);
+    if (desde) query = query.gte('fecha', desde);
+    if (hasta) query = query.lte('fecha', hasta);
+
+    const { data: movimientos, error } = await query;
+
+    if (error) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">Error al cargar: ${error.message}</div></td></tr>`;
+      return;
+    }
+
+    renderResumen(movimientos || []);
+
+    if (!movimientos || movimientos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No hay movimientos con estos filtros.</div></td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = movimientos.map(m => {
+      const esPositivo = m.tipo_movimiento === 'ingreso' || m.tipo_movimiento === 'ajuste_positivo';
+      const nombreProducto = m.productos ? (m.productos.descripcion_1 || m.productos.sku) : '—';
+      const origenLabel = m.origen_tabla === 'ingresos' ? 'Ingreso' : (m.origen_tabla === 'despachos' ? 'Despacho' : (m.origen_tabla || '—'));
+      return `
+        <tr>
+          <td>${m.fecha ? m.fecha.toString().slice(0, 10) : '—'}</td>
+          <td>${nombreProducto}</td>
+          <td><span class="badge ${m.tipo_movimiento}">${m.tipo_movimiento.replace('_', ' ')}</span></td>
+          <td class="${esPositivo ? 'cantidad-mas' : 'cantidad-menos'}">${esPositivo ? '+' : '−'}${m.cantidad}</td>
+          <td>$${(m.costo_unitario || 0).toLocaleString('es-CL')}</td>
+          <td>${m.bodegas ? m.bodegas.nombre : '<span class="muted">—</span>'}</td>
+          <td>${origenLabel}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderResumen(movimientos){
+    const totalIngresos = movimientos.filter(m => m.tipo_movimiento === 'ingreso').reduce((s, m) => s + (m.cantidad || 0), 0);
+    const totalDespachos = movimientos.filter(m => m.tipo_movimiento === 'despacho').reduce((s, m) => s + (m.cantidad || 0), 0);
+    document.getElementById('resumen').innerHTML = `
+      <span><strong>${movimientos.length}</strong> movimiento(s)</span>
+      <span>Total ingresado: <strong>${totalIngresos}</strong></span>
+      <span>Total despachado: <strong>${totalDespachos}</strong></span>
+    `;
+  }
+
+  ['f-producto', 'f-bodega', 'f-tipo', 'f-desde', 'f-hasta'].forEach(id => {
+    document.getElementById(id).addEventListener('change', cargarKardex);
+  });
+
+  document.getElementById('btn-limpiar').addEventListener('click', () => {
+    document.getElementById('f-producto').value = '';
+    document.getElementById('f-bodega').value = '';
+    document.getElementById('f-tipo').value = '';
+    document.getElementById('f-desde').value = '';
+    document.getElementById('f-hasta').value = '';
+    cargarKardex();
+  });
 
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', init);
