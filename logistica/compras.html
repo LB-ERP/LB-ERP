@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root{
     --bg-deep:#10151c; --bg-panel:#171d26; --bg-card:#1b222c;
@@ -240,6 +242,7 @@
 
   let supabaseClient;
   let empresaActivaId = null;
+  let empresaNombre = '';
   let usuarioId = null;
   let proveedoresCache = [];
   let productosCache = [];
@@ -270,6 +273,7 @@
     }
 
     empresaActivaId = relaciones[0].empresas.id;
+    empresaNombre = relaciones[0].empresas.nombre;
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -312,7 +316,7 @@
 
     const { data: compras } = await supabaseClient
       .from('compras')
-      .select('id, fecha, numero_oc, estado, proveedores ( nombre ), compras_items ( cantidad, precio_unitario, productos ( sku, descripcion_1 ) )')
+      .select('id, fecha, numero_oc, estado, proveedor_id, proveedores ( nombre, rut, contacto ), compras_items ( cantidad, precio_unitario, productos ( sku, descripcion_1, unidad_medida ) )')
       .eq('empresa_id', empresaActivaId)
       .order('fecha', { ascending: false })
       .limit(100);
@@ -344,7 +348,12 @@
           <td>${nombresProductos || '<span class="muted">—</span>'}</td>
           <td>$${total.toLocaleString('es-CL')}</td>
           <td><span class="badge ${c.estado}">${c.estado}</span></td>
-          <td><button class="btn btn-ghost btn-sm" onclick="editarCompra('${c.id}')">Editar</button></td>
+          <td>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="editarCompra('${c.id}')">Editar</button>
+              <button class="btn btn-ghost btn-sm" onclick="descargarPDF('${c.id}')">PDF</button>
+            </div>
+          </td>
         </tr>
       `;
     }).join('');
@@ -556,6 +565,69 @@
     cerrarModal();
     await cargarCompras();
   });
+
+  window.descargarPDF = function(compraId){
+    const compra = comprasCache.find(c => c.id === compraId);
+    if (!compra) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    const proveedor = compra.proveedores || {};
+    const items = compra.compras_items || [];
+    const total = items.reduce((s, it) => s + (it.cantidad || 0) * (it.precio_unitario || 0), 0);
+
+    // Encabezado
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text(empresaNombre || 'Empresa', 14, 20);
+
+    doc.setFontSize(13);
+    doc.text('ORDEN DE COMPRA', 14, 30);
+
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(10);
+    doc.text(`N° de orden: ${compra.numero_oc || compra.id.slice(0, 8)}`, 14, 38);
+    doc.text(`Fecha: ${compra.fecha}`, 14, 44);
+    doc.text(`Estado: ${compra.estado}`, 14, 50);
+
+    // Datos del proveedor
+    doc.setFont(undefined, 'bold');
+    doc.text('Proveedor', 130, 38);
+    doc.setFont(undefined, 'normal');
+    doc.text(`${proveedor.nombre || '—'}`, 130, 44);
+    if (proveedor.rut) doc.text(`RUT: ${proveedor.rut}`, 130, 50);
+    if (proveedor.contacto) doc.text(`Contacto: ${proveedor.contacto}`, 130, 56);
+
+    // Tabla de productos
+    const filas = items.map(it => {
+      const nombre = it.productos ? (it.productos.descripcion_1 || it.productos.sku) : '—';
+      const unidad = it.productos ? (it.productos.unidad_medida || 'UN') : 'UN';
+      const subtotal = (it.cantidad || 0) * (it.precio_unitario || 0);
+      return [nombre, unidad, it.cantidad, `$${(it.precio_unitario || 0).toLocaleString('es-CL')}`, `$${subtotal.toLocaleString('es-CL')}`];
+    });
+
+    doc.autoTable({
+      startY: 65,
+      head: [['Producto', 'Unidad', 'Cantidad', 'Precio unit.', 'Subtotal']],
+      body: filas,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [30, 37, 48] },
+      theme: 'grid'
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(12);
+    doc.text(`Total: $${total.toLocaleString('es-CL')}`, 150, finalY, { align: 'left' });
+
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text('Documento generado por el sistema LB ERP.', 14, 285);
+
+    doc.save(`OC_${compra.numero_oc || compra.id.slice(0, 8)}.pdf`);
+  };
 
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', init);
