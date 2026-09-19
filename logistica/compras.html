@@ -10,11 +10,13 @@
 <style>
   :root{
     --bg-deep:#10151c; --bg-panel:#171d26; --bg-card:#1b222c;
-    --line:#2b3542; --accent:#c98a3e; --text-primary:#edeae3; --text-muted:#8b93a1;
+    --line:#2b3542; --accent:#c98a3e; --accent-hover:#dea057;
+    --text-primary:#edeae3; --text-muted:#8b93a1; --error:#d97757; --ok:#7fae86;
   }
   *{box-sizing:border-box;}
   html,body{ margin:0; min-height:100%; font-family:'Work Sans', sans-serif; color:var(--text-primary); background:var(--bg-deep); }
-  a{ color:inherit; }
+  a{ color:inherit; text-decoration:none; }
+
   header{
     display:flex; align-items:center; justify-content:space-between;
     padding:18px 32px; border-bottom:1px solid var(--line); background:var(--bg-panel); flex-wrap:wrap; gap:12px;
@@ -24,12 +26,90 @@
   .crumb{ font-size:13px; color:var(--text-muted); }
   .back-link{
     font-size:13px; color:var(--text-muted); border:1px solid var(--line);
-    padding:8px 14px; border-radius:3px; text-decoration:none; transition:border-color .15s ease;
+    padding:8px 14px; border-radius:3px; transition:border-color .15s ease;
   }
   .back-link:hover{ border-color:var(--accent); }
-  main{ max-width:900px; margin:0 auto; padding:60px 32px; text-align:center; }
-  main h1{ font-family:'Oswald', sans-serif; font-size:26px; margin-bottom:10px; }
-  main p{ color:var(--text-muted); font-size:14.5px; }
+
+  main{ max-width:1150px; margin:0 auto; padding:32px; }
+
+  .toolbar{
+    display:flex; justify-content:space-between; align-items:center; gap:16px;
+    margin-bottom:20px; flex-wrap:wrap;
+  }
+  .toolbar h1{ font-family:'Oswald', sans-serif; font-size:22px; margin:0; font-weight:600; }
+
+  input[type="text"], input[type="number"], input[type="date"], select{
+    background:#12171f; border:1px solid var(--line); border-radius:3px;
+    padding:10px 12px; font-size:14px; color:var(--text-primary); font-family:'Work Sans', sans-serif;
+  }
+  input:focus, select:focus{ outline:none; border-color:var(--accent); }
+
+  .btn{
+    padding:10px 16px; border-radius:3px; font-size:14px; font-weight:600;
+    font-family:'Work Sans', sans-serif; cursor:pointer; border:none;
+  }
+  .btn-primary{ background:var(--accent); color:#161006; }
+  .btn-primary:hover{ background:var(--accent-hover); }
+  .btn-ghost{ background:none; border:1px solid var(--line); color:var(--text-primary); }
+  .btn-ghost:hover{ border-color:var(--accent); }
+  .btn-sm{ padding:6px 10px; font-size:12.5px; }
+  .btn-icon{ padding:9px 11px; }
+
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:4px; background:var(--bg-card); }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{
+    text-align:left; font-family:'Oswald', sans-serif; font-weight:500; font-size:12px;
+    letter-spacing:0.5px; color:var(--text-muted); padding:12px 16px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  tbody td{ padding:12px 16px; border-bottom:1px solid var(--line); font-size:13.5px; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:rgba(255,255,255,0.02); }
+  .muted{ color:var(--text-muted); }
+  .empty-state{ padding:50px; text-align:center; color:var(--text-muted); font-size:14px; }
+
+  .badge{ font-size:11px; padding:2px 9px; border-radius:20px; text-transform:capitalize; white-space:nowrap; }
+  .badge.pendiente{ background:rgba(201,138,62,0.15); color:var(--accent); }
+  .badge.parcial{ background:rgba(123,167,201,0.15); color:#7ba7c9; }
+  .badge.recibida{ background:rgba(127,174,134,0.15); color:var(--ok); }
+  .badge.anulada{ background:rgba(139,147,161,0.15); color:var(--text-muted); }
+
+  /* modal */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    display:none; align-items:center; justify-content:center; padding:20px; z-index:10; overflow-y:auto;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:4px;
+    padding:30px; width:100%; max-width:680px; margin:auto;
+  }
+  .modal.modal-sm{ max-width:380px; }
+  .modal h2{ font-family:'Oswald', sans-serif; font-size:19px; margin:0 0 22px; font-weight:600; }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; color:var(--text-muted); margin-bottom:6px; }
+  .field label .req{ color:var(--accent); }
+  .field input, .field select{ width:100%; }
+  .field-row{ display:flex; gap:12px; align-items:end; }
+  .field-row .field{ flex:1; }
+  .proveedor-row{ display:flex; gap:8px; }
+  .proveedor-row select{ flex:1; }
+
+  .items-title{ font-family:'Oswald', sans-serif; font-size:13px; letter-spacing:1px; color:var(--text-muted); margin:22px 0 10px; }
+  .items-header{ display:flex; gap:10px; margin-bottom:6px; font-size:11px; color:var(--text-muted); }
+  .items-header .col-producto{ flex:2; }
+  .items-header .col-cantidad, .items-header .col-precio{ flex:1; }
+  .item-row{ display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+  .item-row select{ flex:2; }
+  .item-row input{ flex:1; }
+  .item-row .btn-quitar{ background:none; border:none; color:var(--error); cursor:pointer; font-size:18px; padding:0 6px; }
+  .btn-agregar-linea{ font-size:12.5px; margin-top:4px; }
+
+  .total-linea{ text-align:right; font-size:14px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  .total-linea strong{ color:var(--accent); font-size:17px; }
+
+  .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; }
+  .modal-msg{ font-size:13px; margin-top:12px; color:var(--error); display:none; }
+
   .loading{ padding:60px; text-align:center; color:var(--text-muted); font-size:14px; }
 </style>
 </head>
@@ -43,32 +123,439 @@
     <div class="crumb">Logística / Compras</div>
     <a class="back-link" href="../dashboard.html">← Volver al panel</a>
   </header>
+
   <main>
-    <h1>Compras</h1>
-    <p>Este módulo está en construcción. Aquí va a vivir la funcionalidad de las órdenes de compra.</p>
+    <div class="toolbar">
+      <h1>Compras</h1>
+      <button class="btn btn-primary" id="btn-nuevo">+ Nueva orden de compra</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>N° OC</th>
+            <th>Proveedor</th>
+            <th>Productos</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tabla-body">
+          <tr><td colspan="7"><div class="empty-state">Cargando órdenes de compra...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
   </main>
+</div>
+
+<!-- Modal nueva OC -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Nueva orden de compra</h2>
+    <form id="form-compra">
+      <input type="hidden" id="compra-id">
+
+      <div class="field-row">
+        <div class="field">
+          <label for="proveedor">Proveedor <span class="req">*</span></label>
+          <div class="proveedor-row">
+            <select id="proveedor" required><option value="">Selecciona un proveedor</option></select>
+            <button type="button" class="btn btn-ghost btn-icon" id="btn-nuevo-proveedor" title="Nuevo proveedor">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fecha">Fecha</label>
+          <input type="date" id="fecha">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="numero-oc">N° de orden</label>
+          <input type="text" id="numero-oc" placeholder="ej. OC-001 (opcional)">
+        </div>
+        <div class="field">
+          <label for="estado">Estado</label>
+          <select id="estado">
+            <option value="pendiente">Pendiente</option>
+            <option value="parcial">Parcial</option>
+            <option value="recibida">Recibida</option>
+            <option value="anulada">Anulada</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="items-title">PRODUCTOS</div>
+      <div class="items-header">
+        <span class="col-producto">Producto</span>
+        <span class="col-cantidad">Cantidad</span>
+        <span class="col-precio">Precio unit.</span>
+        <span style="width:24px;"></span>
+      </div>
+      <div id="items-container"></div>
+      <button type="button" class="btn btn-ghost btn-sm btn-agregar-linea" id="btn-agregar-linea">+ Agregar producto</button>
+
+      <div class="total-linea">Total: <strong id="total-oc">$0</strong></div>
+
+      <div class="modal-msg" id="modal-msg"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="btn-cancelar">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-guardar">Guardar orden</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal nuevo proveedor -->
+<div class="modal-overlay" id="modal-overlay-proveedor">
+  <div class="modal modal-sm">
+    <h2>Nuevo proveedor</h2>
+    <form id="form-proveedor">
+      <div class="field">
+        <label for="prov-nombre">Nombre <span class="req">*</span></label>
+        <input type="text" id="prov-nombre" required placeholder="ej. Aceros del Sur">
+      </div>
+      <div class="field">
+        <label for="prov-rut">RUT</label>
+        <input type="text" id="prov-rut" placeholder="opcional">
+      </div>
+      <div class="field">
+        <label for="prov-contacto">Contacto</label>
+        <input type="text" id="prov-contacto" placeholder="teléfono o email (opcional)">
+      </div>
+      <div class="modal-msg" id="modal-msg-proveedor"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="btn-cancelar-proveedor">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar proveedor</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
   const SUPABASE_URL = "https://hjcheyewsrnnlyatidvt.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_iQzzt9-ekUisgQaEltnoFQ_VARuLsf4";
 
+  let supabaseClient;
+  let empresaActivaId = null;
+  let usuarioId = null;
+  let proveedoresCache = [];
+  let productosCache = [];
+  let comprasCache = [];
+
   function init(){
     if (typeof window.supabase === 'undefined') {
       document.getElementById('loading').textContent = 'No se pudo cargar la conexión. Desactiva bloqueadores de anuncios y recarga.';
       return;
     }
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    arrancar();
+  }
 
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        window.location.href = "../login.html";
+  async function arrancar(){
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = "../login.html"; return; }
+    usuarioId = session.user.id;
+
+    const { data: relaciones, error } = await supabaseClient
+      .from('usuarios_empresas')
+      .select('empresas ( id, nombre )')
+      .eq('user_id', session.user.id);
+
+    if (error || !relaciones || relaciones.length === 0) {
+      document.getElementById('loading').textContent = 'Tu usuario no está asociado a ninguna empresa.';
+      return;
+    }
+
+    empresaActivaId = relaciones[0].empresas.id;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    await cargarProveedores();
+    await cargarProductos();
+    await cargarCompras();
+  }
+
+  async function cargarProveedores(){
+    const { data } = await supabaseClient
+      .from('proveedores')
+      .select('id, nombre')
+      .eq('empresa_id', empresaActivaId)
+      .order('nombre');
+    proveedoresCache = data || [];
+    const select = document.getElementById('proveedor');
+    select.innerHTML = '<option value="">Selecciona un proveedor</option>' +
+      proveedoresCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+  }
+
+  async function cargarProductos(){
+    const { data } = await supabaseClient
+      .from('productos')
+      .select('id, sku, descripcion_1, costo_unitario')
+      .eq('empresa_id', empresaActivaId)
+      .eq('activo', true)
+      .order('sku');
+    productosCache = data || [];
+  }
+
+  function opcionesProductos(){
+    return '<option value="">Selecciona un producto</option>' +
+      productosCache.map(p => `<option value="${p.id}">${p.sku} — ${p.descripcion_1 || ''}</option>`).join('');
+  }
+
+  async function cargarCompras(){
+    const tbody = document.getElementById('tabla-body');
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Cargando órdenes de compra...</div></td></tr>';
+
+    const { data: compras } = await supabaseClient
+      .from('compras')
+      .select('id, fecha, numero_oc, estado, proveedores ( nombre ), compras_items ( cantidad, precio_unitario, productos ( sku, descripcion_1 ) )')
+      .eq('empresa_id', empresaActivaId)
+      .order('fecha', { ascending: false })
+      .limit(100);
+
+    comprasCache = compras || [];
+    renderTabla();
+  }
+
+  function renderTabla(){
+    const tbody = document.getElementById('tabla-body');
+
+    if (comprasCache.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No hay órdenes de compra todavía. Crea la primera con "+ Nueva orden de compra".</div></td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = comprasCache.map(c => {
+      const items = c.compras_items || [];
+      const total = items.reduce((s, it) => s + (it.cantidad || 0) * (it.precio_unitario || 0), 0);
+      const nombresProductos = items.map(it => {
+        const nombre = it.productos ? (it.productos.descripcion_1 || it.productos.sku) : '—';
+        return `${nombre} (${it.cantidad})`;
+      }).join('<br>');
+      return `
+        <tr>
+          <td>${c.fecha}</td>
+          <td>${c.numero_oc || '<span class="muted">—</span>'}</td>
+          <td>${c.proveedores ? c.proveedores.nombre : '<span class="muted">—</span>'}</td>
+          <td>${nombresProductos || '<span class="muted">—</span>'}</td>
+          <td>$${total.toLocaleString('es-CL')}</td>
+          <td><span class="badge ${c.estado}">${c.estado}</span></td>
+          <td><button class="btn btn-ghost btn-sm" onclick="editarCompra('${c.id}')">Editar</button></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ---- Líneas de productos dinámicas ----
+  function nuevaLineaItem(valores){
+    const div = document.createElement('div');
+    div.className = 'item-row';
+    div.innerHTML = `
+      <select class="item-producto">${opcionesProductos()}</select>
+      <input type="number" class="item-cantidad" placeholder="Cantidad" min="0.01" step="any">
+      <input type="number" class="item-precio" placeholder="Precio unit." min="0" step="any">
+      <button type="button" class="btn-quitar" title="Quitar">×</button>
+    `;
+    if (valores) {
+      div.querySelector('.item-producto').value = valores.producto_id || '';
+      div.querySelector('.item-cantidad').value = valores.cantidad || '';
+      div.querySelector('.item-precio').value = valores.precio_unitario || '';
+    }
+    div.querySelector('.btn-quitar').addEventListener('click', () => { div.remove(); actualizarTotal(); });
+    div.querySelector('.item-cantidad').addEventListener('input', actualizarTotal);
+    div.querySelector('.item-precio').addEventListener('input', actualizarTotal);
+    div.querySelector('.item-producto').addEventListener('change', () => {
+      const producto = productosCache.find(p => p.id === div.querySelector('.item-producto').value);
+      if (producto && !div.querySelector('.item-precio').value) {
+        div.querySelector('.item-precio').value = producto.costo_unitario || '';
+      }
+      actualizarTotal();
+    });
+    return div;
+  }
+
+  function actualizarTotal(){
+    const filas = Array.from(document.querySelectorAll('#items-container .item-row'));
+    const total = filas.reduce((s, fila) => {
+      const cantidad = parseFloat(fila.querySelector('.item-cantidad').value) || 0;
+      const precio = parseFloat(fila.querySelector('.item-precio').value) || 0;
+      return s + cantidad * precio;
+    }, 0);
+    document.getElementById('total-oc').textContent = '$' + total.toLocaleString('es-CL');
+  }
+
+  document.getElementById('btn-agregar-linea').addEventListener('click', () => {
+    document.getElementById('items-container').appendChild(nuevaLineaItem());
+  });
+
+  // ---- Modal proveedor rápido ----
+  const overlayProveedor = document.getElementById('modal-overlay-proveedor');
+  document.getElementById('btn-nuevo-proveedor').addEventListener('click', () => {
+    document.getElementById('form-proveedor').reset();
+    document.getElementById('modal-msg-proveedor').style.display = 'none';
+    overlayProveedor.classList.add('open');
+  });
+  document.getElementById('btn-cancelar-proveedor').addEventListener('click', () => overlayProveedor.classList.remove('open'));
+  overlayProveedor.addEventListener('click', (e) => { if (e.target === overlayProveedor) overlayProveedor.classList.remove('open'); });
+
+  document.getElementById('form-proveedor').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('modal-msg-proveedor');
+    msg.style.display = 'none';
+
+    const payload = {
+      empresa_id: empresaActivaId,
+      nombre: document.getElementById('prov-nombre').value.trim(),
+      rut: document.getElementById('prov-rut').value.trim() || null,
+      contacto: document.getElementById('prov-contacto').value.trim() || null
+    };
+
+    const { data, error } = await supabaseClient.from('proveedores').insert(payload).select().single();
+
+    if (error) {
+      msg.textContent = 'Error al guardar el proveedor.';
+      msg.style.display = 'block';
+      return;
+    }
+
+    await cargarProveedores();
+    document.getElementById('proveedor').value = data.id;
+    overlayProveedor.classList.remove('open');
+  });
+
+  // ---- Modal orden de compra ----
+  const overlay = document.getElementById('modal-overlay');
+  const form = document.getElementById('form-compra');
+  const modalMsg = document.getElementById('modal-msg');
+
+  function abrirModal(compra){
+    modalMsg.style.display = 'none';
+    const container = document.getElementById('items-container');
+    container.innerHTML = '';
+
+    if (compra) {
+      document.getElementById('modal-title').textContent = 'Editar orden de compra';
+      document.getElementById('compra-id').value = compra.id;
+      document.getElementById('proveedor').value = compra.proveedor_id || '';
+      document.getElementById('fecha').value = compra.fecha;
+      document.getElementById('numero-oc').value = compra.numero_oc || '';
+      document.getElementById('estado').value = compra.estado;
+      (compra.compras_items || []).forEach(it => {
+        container.appendChild(nuevaLineaItem({ producto_id: it.producto_id, cantidad: it.cantidad, precio_unitario: it.precio_unitario }));
+      });
+      if (container.children.length === 0) container.appendChild(nuevaLineaItem());
+    } else {
+      document.getElementById('modal-title').textContent = 'Nueva orden de compra';
+      form.reset();
+      document.getElementById('compra-id').value = '';
+      document.getElementById('fecha').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('estado').value = 'pendiente';
+      container.appendChild(nuevaLineaItem());
+    }
+    actualizarTotal();
+    overlay.classList.add('open');
+  }
+
+  function cerrarModal(){ overlay.classList.remove('open'); }
+
+  document.getElementById('btn-nuevo').addEventListener('click', () => abrirModal(null));
+  document.getElementById('btn-cancelar').addEventListener('click', cerrarModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrarModal(); });
+
+  window.editarCompra = function(id){
+    // Necesitamos producto_id de cada línea, que no viene en comprasCache (solo el join de productos)
+    // así que releemos esta compra puntual con producto_id incluido.
+    supabaseClient
+      .from('compras')
+      .select('id, fecha, numero_oc, estado, proveedor_id, compras_items ( producto_id, cantidad, precio_unitario )')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => { if (data) abrirModal(data); });
+  };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    modalMsg.style.display = 'none';
+
+    const id = document.getElementById('compra-id').value;
+    const proveedorId = document.getElementById('proveedor').value;
+    const fecha = document.getElementById('fecha').value || new Date().toISOString().slice(0, 10);
+    const numeroOc = document.getElementById('numero-oc').value.trim() || null;
+    const estado = document.getElementById('estado').value;
+
+    const filas = Array.from(document.querySelectorAll('#items-container .item-row'));
+    const items = filas.map(fila => ({
+      producto_id: fila.querySelector('.item-producto').value,
+      cantidad: parseFloat(fila.querySelector('.item-cantidad').value),
+      precio_unitario: parseFloat(fila.querySelector('.item-precio').value) || 0
+    })).filter(it => it.producto_id && it.cantidad > 0);
+
+    if (!proveedorId) {
+      modalMsg.textContent = 'Selecciona un proveedor.';
+      modalMsg.style.display = 'block';
+      return;
+    }
+    if (items.length === 0) {
+      modalMsg.textContent = 'Agrega al menos un producto con cantidad mayor a 0.';
+      modalMsg.style.display = 'block';
+      return;
+    }
+
+    const btnGuardar = document.getElementById('btn-guardar');
+    btnGuardar.disabled = true;
+    btnGuardar.textContent = 'Guardando...';
+
+    let compraId = id;
+
+    if (id) {
+      await supabaseClient
+        .from('compras')
+        .update({ proveedor_id: proveedorId, fecha, numero_oc: numeroOc, estado })
+        .eq('id', id);
+      // Reemplazamos las líneas: borramos las anteriores y creamos las nuevas
+      await supabaseClient.from('compras_items').delete().eq('compra_id', id);
+    } else {
+      const { data: compra, error: errCompra } = await supabaseClient
+        .from('compras')
+        .insert({ empresa_id: empresaActivaId, proveedor_id: proveedorId, fecha, numero_oc: numeroOc, estado, creado_por: usuarioId })
+        .select()
+        .single();
+
+      if (errCompra) {
+        modalMsg.textContent = 'Error al crear la orden: ' + errCompra.message;
+        modalMsg.style.display = 'block';
+        btnGuardar.disabled = false;
+        btnGuardar.textContent = 'Guardar orden';
         return;
       }
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-    });
-  }
+      compraId = compra.id;
+    }
+
+    const itemsPayload = items.map(it => ({
+      compra_id: compraId,
+      producto_id: it.producto_id,
+      cantidad: it.cantidad,
+      precio_unitario: it.precio_unitario,
+      cantidad_recibida: 0
+    }));
+    const { error: errItems } = await supabaseClient.from('compras_items').insert(itemsPayload);
+
+    btnGuardar.disabled = false;
+    btnGuardar.textContent = 'Guardar orden';
+
+    if (errItems) {
+      modalMsg.textContent = 'La orden se guardó, pero hubo un error con algunos productos: ' + errItems.message;
+      modalMsg.style.display = 'block';
+      return;
+    }
+
+    cerrarModal();
+    await cargarCompras();
+  });
 
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', init);
