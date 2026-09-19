@@ -10,11 +10,13 @@
 <style>
   :root{
     --bg-deep:#10151c; --bg-panel:#171d26; --bg-card:#1b222c;
-    --line:#2b3542; --accent:#c98a3e; --text-primary:#edeae3; --text-muted:#8b93a1;
+    --line:#2b3542; --accent:#c98a3e; --accent-hover:#dea057;
+    --text-primary:#edeae3; --text-muted:#8b93a1; --error:#d97757; --ok:#7fae86;
   }
   *{box-sizing:border-box;}
   html,body{ margin:0; min-height:100%; font-family:'Work Sans', sans-serif; color:var(--text-primary); background:var(--bg-deep); }
-  a{ color:inherit; }
+  a{ color:inherit; text-decoration:none; }
+
   header{
     display:flex; align-items:center; justify-content:space-between;
     padding:18px 32px; border-bottom:1px solid var(--line); background:var(--bg-panel); flex-wrap:wrap; gap:12px;
@@ -24,12 +26,68 @@
   .crumb{ font-size:13px; color:var(--text-muted); }
   .back-link{
     font-size:13px; color:var(--text-muted); border:1px solid var(--line);
-    padding:8px 14px; border-radius:3px; text-decoration:none; transition:border-color .15s ease;
+    padding:8px 14px; border-radius:3px; transition:border-color .15s ease;
   }
   .back-link:hover{ border-color:var(--accent); }
-  main{ max-width:900px; margin:0 auto; padding:60px 32px; text-align:center; }
-  main h1{ font-family:'Oswald', sans-serif; font-size:26px; margin-bottom:10px; }
-  main p{ color:var(--text-muted); font-size:14.5px; }
+
+  main{ max-width:1000px; margin:0 auto; padding:32px; }
+
+  .toolbar{
+    display:flex; justify-content:space-between; align-items:center; gap:16px;
+    margin-bottom:20px; flex-wrap:wrap;
+  }
+  .toolbar h1{ font-family:'Oswald', sans-serif; font-size:22px; margin:0; font-weight:600; }
+
+  input[type="text"]{
+    background:#12171f; border:1px solid var(--line); border-radius:3px;
+    padding:10px 12px; font-size:14px; color:var(--text-primary); font-family:'Work Sans', sans-serif; width:100%;
+  }
+  input:focus{ outline:none; border-color:var(--accent); }
+
+  .btn{
+    padding:10px 16px; border-radius:3px; font-size:14px; font-weight:600;
+    font-family:'Work Sans', sans-serif; cursor:pointer; border:none;
+  }
+  .btn-primary{ background:var(--accent); color:#161006; }
+  .btn-primary:hover{ background:var(--accent-hover); }
+  .btn-ghost{ background:none; border:1px solid var(--line); color:var(--text-primary); }
+  .btn-ghost:hover{ border-color:var(--accent); }
+  .btn-sm{ padding:6px 10px; font-size:12.5px; }
+
+  .grid-bodegas{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:14px;
+  }
+  .card-bodega{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:4px; padding:20px;
+  }
+  .card-bodega .nombre{ font-family:'Oswald', sans-serif; font-size:18px; font-weight:500; margin-bottom:4px; }
+  .card-bodega .ubicacion{ font-size:12.5px; color:var(--text-muted); margin-bottom:14px; min-height:16px; }
+  .card-bodega .conteo{ font-size:13px; margin-bottom:16px; }
+  .card-bodega .conteo strong{ color:var(--accent); }
+  .card-bodega .acciones{ display:flex; gap:8px; }
+  .badge-inactivo{
+    display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; margin-bottom:10px;
+    background:rgba(139,147,161,0.15); color:var(--text-muted);
+  }
+  .empty-state{ padding:50px; text-align:center; color:var(--text-muted); font-size:14px; grid-column:1/-1; }
+
+  /* modal */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    display:none; align-items:center; justify-content:center; padding:20px; z-index:10;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:4px;
+    padding:30px; width:100%; max-width:400px;
+  }
+  .modal h2{ font-family:'Oswald', sans-serif; font-size:19px; margin:0 0 22px; font-weight:600; }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; color:var(--text-muted); margin-bottom:6px; }
+  .field label .req{ color:var(--accent); }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; }
+  .modal-msg{ font-size:13px; margin-top:12px; color:var(--error); display:none; }
+
   .loading{ padding:60px; text-align:center; color:var(--text-muted); font-size:14px; }
 </style>
 </head>
@@ -43,32 +101,207 @@
     <div class="crumb">Logística / Almacenamiento</div>
     <a class="back-link" href="../dashboard.html">← Volver al panel</a>
   </header>
+
   <main>
-    <h1>Almacenamiento</h1>
-    <p>Este módulo está en construcción. Aquí va a vivir la funcionalidad de las bodegas y ubicaciones.</p>
+    <div class="toolbar">
+      <h1>Almacenamiento</h1>
+      <button class="btn btn-primary" id="btn-nuevo">+ Nueva bodega</button>
+    </div>
+
+    <div class="grid-bodegas" id="grid-bodegas">
+      <div class="empty-state">Cargando bodegas...</div>
+    </div>
   </main>
+</div>
+
+<!-- Modal crear/editar bodega -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Nueva bodega</h2>
+    <form id="form-bodega">
+      <input type="hidden" id="bodega-id">
+      <div class="field">
+        <label for="nombre">Nombre <span class="req">*</span></label>
+        <input type="text" id="nombre" required placeholder="ej. Bodega Central">
+      </div>
+      <div class="field">
+        <label for="ubicacion">Ubicación</label>
+        <input type="text" id="ubicacion" placeholder="ej. Av. Industrial 1234, Santiago">
+      </div>
+      <div class="modal-msg" id="modal-msg"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="btn-cancelar">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-guardar">Guardar</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
   const SUPABASE_URL = "https://hjcheyewsrnnlyatidvt.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_iQzzt9-ekUisgQaEltnoFQ_VARuLsf4";
 
+  let supabaseClient;
+  let empresaActivaId = null;
+  let bodegasCache = [];
+
   function init(){
     if (typeof window.supabase === 'undefined') {
       document.getElementById('loading').textContent = 'No se pudo cargar la conexión. Desactiva bloqueadores de anuncios y recarga.';
       return;
     }
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        window.location.href = "../login.html";
-        return;
-      }
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-    });
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    arrancar();
   }
+
+  async function arrancar(){
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = "../login.html"; return; }
+
+    const { data: relaciones, error } = await supabaseClient
+      .from('usuarios_empresas')
+      .select('empresas ( id, nombre )')
+      .eq('user_id', session.user.id);
+
+    if (error || !relaciones || relaciones.length === 0) {
+      document.getElementById('loading').textContent = 'Tu usuario no está asociado a ninguna empresa.';
+      return;
+    }
+
+    empresaActivaId = relaciones[0].empresas.id;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    await cargarBodegas();
+  }
+
+  async function cargarBodegas(){
+    const grid = document.getElementById('grid-bodegas');
+    grid.innerHTML = '<div class="empty-state">Cargando bodegas...</div>';
+
+    const { data: bodegas } = await supabaseClient
+      .from('bodegas')
+      .select('*')
+      .eq('empresa_id', empresaActivaId)
+      .order('nombre');
+
+    const { data: productos } = await supabaseClient
+      .from('productos')
+      .select('bodega_id')
+      .eq('empresa_id', empresaActivaId)
+      .eq('activo', true);
+
+    const conteoPorBodega = {};
+    (productos || []).forEach(p => {
+      if (p.bodega_id) conteoPorBodega[p.bodega_id] = (conteoPorBodega[p.bodega_id] || 0) + 1;
+    });
+
+    bodegasCache = bodegas || [];
+    renderGrid(conteoPorBodega);
+  }
+
+  function renderGrid(conteoPorBodega){
+    const grid = document.getElementById('grid-bodegas');
+
+    if (bodegasCache.length === 0) {
+      grid.innerHTML = '<div class="empty-state">No hay bodegas todavía. Crea la primera con "+ Nueva bodega".</div>';
+      return;
+    }
+
+    grid.innerHTML = bodegasCache.map(b => {
+      const cantidad = conteoPorBodega[b.id] || 0;
+      return `
+        <div class="card-bodega">
+          ${b.activo ? '' : '<div class="badge-inactivo">Inactiva</div>'}
+          <div class="nombre">${b.nombre}</div>
+          <div class="ubicacion">${b.ubicacion || ''}</div>
+          <div class="conteo"><strong>${cantidad}</strong> producto${cantidad === 1 ? '' : 's'} asignado${cantidad === 1 ? '' : 's'}</div>
+          <div class="acciones">
+            <button class="btn btn-ghost btn-sm" onclick="editarBodega('${b.id}')">Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleActivo('${b.id}', ${b.activo})">${b.activo ? 'Desactivar' : 'Activar'}</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Modal
+  const overlay = document.getElementById('modal-overlay');
+  const form = document.getElementById('form-bodega');
+  const modalMsg = document.getElementById('modal-msg');
+
+  function abrirModal(bodega){
+    modalMsg.style.display = 'none';
+    if (bodega) {
+      document.getElementById('modal-title').textContent = 'Editar bodega';
+      document.getElementById('bodega-id').value = bodega.id;
+      document.getElementById('nombre').value = bodega.nombre;
+      document.getElementById('ubicacion').value = bodega.ubicacion || '';
+    } else {
+      document.getElementById('modal-title').textContent = 'Nueva bodega';
+      form.reset();
+      document.getElementById('bodega-id').value = '';
+    }
+    overlay.classList.add('open');
+  }
+
+  function cerrarModal(){
+    overlay.classList.remove('open');
+  }
+
+  document.getElementById('btn-nuevo').addEventListener('click', () => abrirModal(null));
+  document.getElementById('btn-cancelar').addEventListener('click', cerrarModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrarModal(); });
+
+  window.editarBodega = function(id){
+    const bodega = bodegasCache.find(b => b.id === id);
+    if (bodega) abrirModal(bodega);
+  };
+
+  window.toggleActivo = async function(id, activoActual){
+    const { error } = await supabaseClient
+      .from('bodegas')
+      .update({ activo: !activoActual })
+      .eq('id', id);
+
+    if (!error) await cargarBodegas();
+  };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btnGuardar = document.getElementById('btn-guardar');
+    btnGuardar.disabled = true;
+    btnGuardar.textContent = 'Guardando...';
+    modalMsg.style.display = 'none';
+
+    const id = document.getElementById('bodega-id').value;
+    const payload = {
+      empresa_id: empresaActivaId,
+      nombre: document.getElementById('nombre').value.trim(),
+      ubicacion: document.getElementById('ubicacion').value.trim() || null
+    };
+
+    let error;
+    if (id) {
+      delete payload.empresa_id;
+      ({ error } = await supabaseClient.from('bodegas').update(payload).eq('id', id));
+    } else {
+      ({ error } = await supabaseClient.from('bodegas').insert(payload));
+    }
+
+    btnGuardar.disabled = false;
+    btnGuardar.textContent = 'Guardar';
+
+    if (error) {
+      modalMsg.textContent = 'Ocurrió un error al guardar. Intenta de nuevo.';
+      modalMsg.style.display = 'block';
+      return;
+    }
+
+    cerrarModal();
+    await cargarBodegas();
+  });
 
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', init);
