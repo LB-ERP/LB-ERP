@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LB ERP · Reportes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg-deep:#10151c; --bg-panel:#171d26; --bg-card:#1b222c;
+    --line:#2b3542; --accent:#c98a3e; --accent-2:#7fae86; --accent-3:#7ba7c9;
+    --text-primary:#edeae3; --text-muted:#8b93a1; --error:#d97757; --ok:#7fae86;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; min-height:100%; font-family:'Work Sans', sans-serif; color:var(--text-primary); background:var(--bg-deep); }
+  a{ color:inherit; text-decoration:none; }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 32px; border-bottom:1px solid var(--line); background:var(--bg-panel); flex-wrap:wrap; gap:12px;
+  }
+  .brand{ display:flex; align-items:baseline; gap:8px; font-family:'Oswald', sans-serif; font-weight:700; font-size:22px; }
+  .brand span{ color:var(--accent); }
+  .crumb{ font-size:13px; color:var(--text-muted); }
+  .back-link{
+    font-size:13px; color:var(--text-muted); border:1px solid var(--line);
+    padding:8px 14px; border-radius:3px; transition:border-color .15s ease;
+  }
+  .back-link:hover{ border-color:var(--accent); }
+
+  main{ max-width:1200px; margin:0 auto; padding:32px; }
+  h1{ font-family:'Oswald', sans-serif; font-size:22px; margin:0 0 24px; font-weight:600; }
+
+  .kpis{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:14px; margin-bottom:28px;
+  }
+  .kpi-card{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:4px; padding:18px 20px;
+  }
+  .kpi-card .label{ font-size:12px; color:var(--text-muted); margin-bottom:8px; }
+  .kpi-card .valor{ font-family:'Oswald', sans-serif; font-size:26px; font-weight:600; }
+
+  .charts-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:20px;
+  }
+  @media (max-width: 860px){ .charts-grid{ grid-template-columns:1fr; } }
+
+  .chart-card{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:4px; padding:20px;
+  }
+  .chart-card h3{ font-family:'Oswald', sans-serif; font-size:15px; font-weight:500; margin:0 0 16px; }
+  .chart-card.full{ grid-column:1/-1; }
+  .chart-wrap{ position:relative; height:280px; }
+  .empty-mini{ color:var(--text-muted); font-size:13px; text-align:center; padding:40px 0; }
+
+  .loading{ padding:60px; text-align:center; color:var(--text-muted); font-size:14px; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">Verificando sesión...</div>
+
+<div id="app" style="display:none;">
+  <header>
+    <div class="brand">LB<span>·</span>ERP</div>
+    <div class="crumb">Logística / Reportes</div>
+    <a class="back-link" href="../dashboard.html">← Volver al panel</a>
+  </header>
+
+  <main>
+    <h1>Reportes</h1>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Valor de inventario — top 10 productos</h3>
+        <div class="chart-wrap"><canvas id="chart-valor"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Stock por bodega (unidades)</h3>
+        <div class="chart-wrap"><canvas id="chart-bodegas"></canvas></div>
+      </div>
+      <div class="chart-card full">
+        <h3>Ingresos vs Despachos — últimos 14 días</h3>
+        <div class="chart-wrap"><canvas id="chart-movimientos"></canvas></div>
+      </div>
+      <div class="chart-card full">
+        <h3>Productos con stock bajo el mínimo</h3>
+        <div class="chart-wrap"><canvas id="chart-stock-bajo"></canvas></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://hjcheyewsrnnlyatidvt.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_iQzzt9-ekUisgQaEltnoFQ_VARuLsf4";
+
+  const COLOR_ACCENT = '#c98a3e';
+  const COLOR_OK = '#7fae86';
+  const COLOR_ERROR = '#d97757';
+  const COLOR_BLUE = '#7ba7c9';
+  const COLOR_MUTED = '#8b93a1';
+  const COLOR_GRID = '#2b3542';
+
+  Chart.defaults.color = COLOR_MUTED;
+  Chart.defaults.borderColor = COLOR_GRID;
+  Chart.defaults.font.family = "'Work Sans', sans-serif";
+
+  let supabaseClient;
+  let empresaActivaId = null;
+
+  function init(){
+    if (typeof window.supabase === 'undefined' || typeof window.Chart === 'undefined') {
+      document.getElementById('loading').textContent = 'No se pudo cargar la conexión o las librerías de gráficos. Desactiva bloqueadores de anuncios y recarga.';
+      return;
+    }
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    arrancar();
+  }
+
+  async function arrancar(){
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = "../login.html"; return; }
+
+    const { data: relaciones, error } = await supabaseClient
+      .from('usuarios_empresas')
+      .select('empresas ( id, nombre )')
+      .eq('user_id', session.user.id);
+
+    if (error || !relaciones || relaciones.length === 0) {
+      document.getElementById('loading').textContent = 'Tu usuario no está asociado a ninguna empresa.';
+      return;
+    }
+
+    empresaActivaId = relaciones[0].empresas.id;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    await cargarTodo();
+  }
+
+  async function cargarTodo(){
+    const [{ data: productos }, { data: bodegas }, { data: kardex }] = await Promise.all([
+      supabaseClient.from('productos').select('*').eq('empresa_id', empresaActivaId).eq('activo', true),
+      supabaseClient.from('bodegas').select('id, nombre').eq('empresa_id', empresaActivaId).eq('activo', true),
+      supabaseClient.from('kardex').select('fecha, tipo_movimiento, cantidad, bodega_id')
+        .eq('empresa_id', empresaActivaId)
+        .order('fecha', { ascending: false })
+        .limit(1000)
+    ]);
+
+    renderKpis(productos || [], kardex || []);
+    renderChartValor(productos || []);
+    renderChartBodegas(productos || [], bodegas || []);
+    renderChartMovimientos(kardex || []);
+    renderChartStockBajo(productos || []);
+  }
+
+  function renderKpis(productos, kardex){
+    const valorTotal = productos.reduce((s, p) => s + (p.stock_actual || 0) * (p.costo_unitario || 0), 0);
+    const stockBajoCount = productos.filter(p => (p.stock_actual || 0) < (p.stock_minimo || 0)).length;
+    const movimientos30d = kardex.filter(k => {
+      const dias = (Date.now() - new Date(k.fecha)) / (1000 * 60 * 60 * 24);
+      return dias <= 30;
+    }).length;
+
+    document.getElementById('kpis').innerHTML = `
+      <div class="kpi-card">
+        <div class="label">Valor total de inventario</div>
+        <div class="valor">$${Math.round(valorTotal).toLocaleString('es-CL')}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Productos activos</div>
+        <div class="valor">${productos.length}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Con stock bajo el mínimo</div>
+        <div class="valor" style="color:${stockBajoCount > 0 ? 'var(--error)' : 'var(--text-primary)'}">${stockBajoCount}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Movimientos (30 días)</div>
+        <div class="valor">${movimientos30d}</div>
+      </div>
+    `;
+  }
+
+  function vacio(canvasId, mensaje){
+    const canvas = document.getElementById(canvasId);
+    const wrap = canvas.parentElement;
+    wrap.innerHTML = `<div class="empty-mini">${mensaje}</div>`;
+  }
+
+  function renderChartValor(productos){
+    const conValor = productos
+      .map(p => ({ nombre: p.descripcion_1 || p.sku, valor: (p.stock_actual || 0) * (p.costo_unitario || 0) }))
+      .filter(p => p.valor > 0)
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 10);
+
+    if (conValor.length === 0) { vacio('chart-valor', 'No hay productos con valor de inventario todavía.'); return; }
+
+    new Chart(document.getElementById('chart-valor'), {
+      type: 'bar',
+      data: {
+        labels: conValor.map(p => p.nombre),
+        datasets: [{ data: conValor.map(p => p.valor), backgroundColor: COLOR_ACCENT, borderRadius: 3 }]
+      },
+      options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: COLOR_GRID }, ticks: { callback: v => '$' + v.toLocaleString('es-CL') } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  function renderChartBodegas(productos, bodegas){
+    const stockPorBodega = {};
+    bodegas.forEach(b => { stockPorBodega[b.id] = 0; });
+    let sinAsignar = 0;
+    productos.forEach(p => {
+      if (p.bodega_id && stockPorBodega.hasOwnProperty(p.bodega_id)) {
+        stockPorBodega[p.bodega_id] += (p.stock_actual || 0);
+      } else {
+        sinAsignar += (p.stock_actual || 0);
+      }
+    });
+
+    const labels = bodegas.map(b => b.nombre);
+    const data = bodegas.map(b => stockPorBodega[b.id]);
+    if (sinAsignar > 0) { labels.push('Sin asignar'); data.push(sinAsignar); }
+
+    if (data.every(v => v === 0)) { vacio('chart-bodegas', 'No hay stock asignado a bodegas todavía.'); return; }
+
+    const paleta = [COLOR_ACCENT, COLOR_BLUE, COLOR_OK, COLOR_ERROR, '#a893c9', '#c9a893'];
+
+    new Chart(document.getElementById('chart-bodegas'), {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: labels.map((_, i) => paleta[i % paleta.length]) }] },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } } }
+    });
+  }
+
+  function renderChartMovimientos(kardex){
+    const dias = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      dias.push(d.toISOString().slice(0, 10));
+    }
+
+    const ingresosPorDia = {};
+    const despachosPorDia = {};
+    dias.forEach(d => { ingresosPorDia[d] = 0; despachosPorDia[d] = 0; });
+
+    kardex.forEach(k => {
+      const dia = k.fecha ? k.fecha.toString().slice(0, 10) : null;
+      if (!dia || !(dia in ingresosPorDia)) return;
+      if (k.tipo_movimiento === 'ingreso') ingresosPorDia[dia] += (k.cantidad || 0);
+      if (k.tipo_movimiento === 'despacho') despachosPorDia[dia] += (k.cantidad || 0);
+    });
+
+    const totalMov = dias.reduce((s, d) => s + ingresosPorDia[d] + despachosPorDia[d], 0);
+    if (totalMov === 0) { vacio('chart-movimientos', 'No hay movimientos en los últimos 14 días.'); return; }
+
+    new Chart(document.getElementById('chart-movimientos'), {
+      type: 'bar',
+      data: {
+        labels: dias.map(d => d.slice(5)),
+        datasets: [
+          { label: 'Ingresos', data: dias.map(d => ingresosPorDia[d]), backgroundColor: COLOR_OK, borderRadius: 3 },
+          { label: 'Despachos', data: dias.map(d => despachosPorDia[d]), backgroundColor: COLOR_ERROR, borderRadius: 3 }
+        ]
+      },
+      options: {
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: COLOR_GRID }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  function renderChartStockBajo(productos){
+    const bajos = productos
+      .map(p => ({ nombre: p.descripcion_1 || p.sku, actual: p.stock_actual || 0, minimo: p.stock_minimo || 0 }))
+      .filter(p => p.actual < p.minimo)
+      .sort((a, b) => (a.actual - a.minimo) - (b.actual - b.minimo))
+      .slice(0, 10);
+
+    if (bajos.length === 0) { vacio('chart-stock-bajo', 'Ningún producto está bajo su stock mínimo. 👍'); return; }
+
+    new Chart(document.getElementById('chart-stock-bajo'), {
+      type: 'bar',
+      data: {
+        labels: bajos.map(p => p.nombre),
+        datasets: [
+          { label: 'Stock actual', data: bajos.map(p => p.actual), backgroundColor: COLOR_ERROR, borderRadius: 3 },
+          { label: 'Stock mínimo', data: bajos.map(p => p.minimo), backgroundColor: COLOR_MUTED, borderRadius: 3 }
+        ]
+      },
+      options: {
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: COLOR_GRID }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>
+
+</body>
+</html>
