@@ -85,6 +85,9 @@
   .field-row .field{ flex:1; }
 
   .items-title{ font-family:'Oswald', sans-serif; font-size:13px; letter-spacing:1px; color:var(--text-muted); margin:22px 0 10px; }
+  .items-header{ display:flex; gap:10px; margin-bottom:6px; font-size:11px; color:var(--text-muted); }
+  .items-header .col-producto{ flex:2; }
+  .items-header .col-cantidad, .items-header .col-costo{ flex:1; }
   .item-row{ display:flex; gap:10px; align-items:center; margin-bottom:10px; }
   .item-row select{ flex:2; }
   .item-row input{ flex:1; }
@@ -123,10 +126,11 @@
             <th>Bodega</th>
             <th>Productos</th>
             <th>Unidades ingresadas</th>
+            <th>Costo total</th>
           </tr>
         </thead>
         <tbody id="tabla-body">
-          <tr><td colspan="5"><div class="empty-state">Cargando ingresos...</div></td></tr>
+          <tr><td colspan="6"><div class="empty-state">Cargando ingresos...</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -156,6 +160,12 @@
       </div>
 
       <div class="items-title">PRODUCTOS RECIBIDOS</div>
+      <div class="items-header">
+        <span class="col-producto">Producto</span>
+        <span class="col-cantidad">Cantidad</span>
+        <span class="col-costo">Costo unitario</span>
+        <span style="width:24px;"></span>
+      </div>
       <div id="items-container"></div>
       <button type="button" class="btn btn-ghost btn-sm btn-agregar-linea" id="btn-agregar-linea">+ Agregar producto</button>
 
@@ -228,7 +238,7 @@
   async function cargarProductos(){
     const { data } = await supabaseClient
       .from('productos')
-      .select('id, sku, descripcion_1, stock_actual')
+      .select('id, sku, descripcion_1, stock_actual, costo_unitario')
       .eq('empresa_id', empresaActivaId)
       .eq('activo', true)
       .order('sku');
@@ -246,19 +256,20 @@
 
     const { data: ingresos } = await supabaseClient
       .from('ingresos')
-      .select('id, fecha, numero_ingreso, bodegas ( nombre ), ingresos_items ( cantidad )')
+      .select('id, fecha, numero_ingreso, bodegas ( nombre ), ingresos_items ( cantidad, costo_unitario )')
       .eq('empresa_id', empresaActivaId)
       .order('fecha', { ascending: false })
       .limit(50);
 
     if (!ingresos || ingresos.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state">No hay ingresos registrados todavía. Crea el primero con "+ Nuevo ingreso".</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">No hay ingresos registrados todavía. Crea el primero con "+ Nuevo ingreso".</div></td></tr>';
       return;
     }
 
     tbody.innerHTML = ingresos.map(i => {
       const items = i.ingresos_items || [];
       const totalUnidades = items.reduce((sum, it) => sum + (it.cantidad || 0), 0);
+      const costoTotal = items.reduce((sum, it) => sum + (it.cantidad || 0) * (it.costo_unitario || 0), 0);
       return `
         <tr>
           <td>${i.fecha}</td>
@@ -266,6 +277,7 @@
           <td>${i.bodegas ? i.bodegas.nombre : '<span class="muted">—</span>'}</td>
           <td>${items.length}</td>
           <td>${totalUnidades}</td>
+          <td>$${costoTotal.toLocaleString('es-CL')}</td>
         </tr>
       `;
     }).join('');
@@ -278,6 +290,7 @@
     div.innerHTML = `
       <select class="item-producto">${opcionesProductos()}</select>
       <input type="number" class="item-cantidad" placeholder="Cantidad" min="0.01" step="any">
+      <input type="number" class="item-costo" placeholder="Costo unit." min="0" step="any">
       <button type="button" class="btn-quitar" title="Quitar">×</button>
     `;
     div.querySelector('.btn-quitar').addEventListener('click', () => div.remove());
@@ -322,8 +335,9 @@
     const filas = Array.from(document.querySelectorAll('#items-container .item-row'));
     const items = filas.map(fila => ({
       producto_id: fila.querySelector('.item-producto').value,
-      cantidad: parseFloat(fila.querySelector('.item-cantidad').value)
-    })).filter(it => it.producto_id && it.cantidad > 0);
+      cantidad: parseFloat(fila.querySelector('.item-cantidad').value),
+      costo_unitario: parseFloat(fila.querySelector('.item-costo').value)
+    })).filter(it => it.producto_id && it.cantidad > 0 && !isNaN(it.costo_unitario) && it.costo_unitario >= 0);
 
     if (!bodegaId) {
       modalMsg.textContent = 'Selecciona una bodega de destino.';
@@ -331,7 +345,7 @@
       return;
     }
     if (items.length === 0) {
-      modalMsg.textContent = 'Agrega al menos un producto con cantidad mayor a 0.';
+      modalMsg.textContent = 'Agrega al menos un producto con cantidad y costo unitario válidos.';
       modalMsg.style.display = 'block';
       return;
     }
@@ -362,7 +376,12 @@
     }
 
     // 2. Crear las líneas (ingresos_items) y el registro de Kardex por cada una
-    const itemsPayload = items.map(it => ({ ingreso_id: ingreso.id, producto_id: it.producto_id, cantidad: it.cantidad }));
+    const itemsPayload = items.map(it => ({
+      ingreso_id: ingreso.id,
+      producto_id: it.producto_id,
+      cantidad: it.cantidad,
+      costo_unitario: it.costo_unitario
+    }));
     const { error: errItems } = await supabaseClient.from('ingresos_items').insert(itemsPayload);
 
     const kardexPayload = items.map(it => ({
@@ -371,6 +390,7 @@
       bodega_id: bodegaId,
       tipo_movimiento: 'ingreso',
       cantidad: it.cantidad,
+      costo_unitario: it.costo_unitario,
       origen_tabla: 'ingresos',
       origen_id: ingreso.id,
       fecha: fecha,
@@ -378,13 +398,21 @@
     }));
     await supabaseClient.from('kardex').insert(kardexPayload);
 
-    // 3. Sumar el stock en cada producto afectado
+    // 3. Sumar el stock y recalcular el costo unitario como promedio ponderado:
+    //    (stock previo × costo previo + cantidad nueva × costo nuevo) / stock total
     for (const it of items) {
       const producto = productosCache.find(p => p.id === it.producto_id);
-      const stockActualPrevio = producto ? (producto.stock_actual || 0) : 0;
+      const stockPrevio = producto ? (producto.stock_actual || 0) : 0;
+      const costoPrevio = producto ? (producto.costo_unitario || 0) : 0;
+      const stockNuevo = stockPrevio + it.cantidad;
+
+      const costoPonderado = stockNuevo > 0
+        ? Math.round(((stockPrevio * costoPrevio) + (it.cantidad * it.costo_unitario)) / stockNuevo * 100) / 100
+        : it.costo_unitario;
+
       await supabaseClient
         .from('productos')
-        .update({ stock_actual: stockActualPrevio + it.cantidad })
+        .update({ stock_actual: stockNuevo, costo_unitario: costoPonderado })
         .eq('id', it.producto_id);
     }
 
